@@ -4,10 +4,6 @@
 <dict>
 	<key>CFBundleIdentifier</key>
 	<string>com.rod.island</string>
-	<key>CFBundleExecutable</key>
-	<string>Island</string>
-	<key>CFBundlePackageType</key>
-	<string>APPL</string>
 	<key>LSUIElement</key>
 	<true/>
 	<key>NSAudioCaptureUsageDescription</key>

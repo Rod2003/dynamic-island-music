@@ -9,17 +9,16 @@ panel.isOpaque = false
 panel.backgroundColor = .clear
 panel.hasShadow = false
 panel.ignoresMouseEvents = true
-panel.level = .mainMenu + 3 // above the menu bar
+panel.level = .mainMenu + 3
 panel.collectionBehavior = [.canJoinAllSpaces, .stationary, .fullScreenAuxiliary, .ignoresCycle]
 
 func layout() {
-    // ponytail: notched screens only; Macs without one show nothing
     guard let screen = NSScreen.screens.first(where: { $0.safeAreaInsets.top > 0 }),
           let left = screen.auxiliaryTopLeftArea, let right = screen.auxiliaryTopRightArea else { return }
     let height = screen.safeAreaInsets.top, notchWidth = screen.frame.width - left.width - right.width
     let size = CGSize(width: notchWidth + 2 * (height + IslandView.flare), height: height)
     let hosting = NSHostingView(rootView: IslandView(spotify: spotify, tap: tap, notchWidth: notchWidth, height: height))
-    hosting.sizingOptions = [] // the panel sets the size; skip SwiftUI re-measuring every frame
+    hosting.sizingOptions = []
     panel.contentView = hosting
     panel.setFrame(NSRect(x: screen.frame.midX - size.width / 2, y: screen.frame.maxY - size.height, width: size.width, height: size.height), display: true)
 }
@@ -36,20 +35,17 @@ struct IslandView: View {
     let notchWidth: CGFloat
     let height: CGFloat
 
-    // Same flare/curve as the hardware notch (values from boring.notch), so this reads as the notch growing.
-    // Each wing is a square the size of the notch height: content plus `inset` on every side, like iOS.
     static let flare: CGFloat = 6, bottomRadius: CGFloat = 14, inset: CGFloat = 5
 
     var body: some View {
-        let content = height - 2 * Self.inset
         HStack(spacing: 0) {
             AsyncImage(url: spotify.artworkURL) { $0.resizable() } placeholder: { Color.gray.opacity(0.3) }
-                .frame(width: content, height: content)
                 .clipShape(RoundedRectangle(cornerRadius: 5))
+                .padding(Self.inset)
                 .frame(width: height)
             Spacer().frame(width: notchWidth)
             Bars(tap: tap)
-                .frame(width: content, height: content)
+                .padding(Self.inset)
                 .frame(width: height)
         }
         .padding(.horizontal, Self.flare)
@@ -66,8 +62,6 @@ struct Bars: NSViewRepresentable {
     func updateNSView(_ view: BarsView, context: Context) {}
 }
 
-/// Core Animation bars: levels arrive ~60×/s and the render server interpolates between them,
-/// so SwiftUI never re-renders for the waveform.
 final class BarsView: NSView {
     private let bars = (0..<6).map { _ in CALayer() }
 
@@ -89,21 +83,19 @@ final class BarsView: NSView {
         CATransaction.setDisableActions(true)
         for (i, (bar, level)) in zip(bars, levels).enumerated() {
             bar.position = CGPoint(x: (CGFloat(i) + 0.5) * bounds.width / CGFloat(bars.count), y: bounds.midY)
-            // Start from where the bar is on screen, not its last target, so retargeting never jumps.
             let from = bar.presentation()?.bounds.height ?? bar.bounds.height
             let to = max(3, CGFloat(level) * bounds.height)
             bar.bounds.size.height = to
             let animation = CABasicAnimation(keyPath: "bounds.size.height")
             animation.fromValue = from
             animation.toValue = to
-            animation.duration = 1.2 / AudioTap.publishRate // a bit longer than the gap between updates: no stalls
+            animation.duration = 1.2 / AudioTap.publishRate
             bar.add(animation, forKey: "height")
         }
         CATransaction.commit()
     }
 }
 
-/// Notch silhouette: top corners flare outward into the screen edge (the "S"), bottom corners round in.
 struct NotchShape: Shape {
     func path(in r: CGRect) -> Path {
         let f = IslandView.flare, b = IslandView.bottomRadius

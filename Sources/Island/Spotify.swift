@@ -1,5 +1,4 @@
-import AppKit
-import Observation
+import SwiftUI
 
 @Observable final class Spotify {
     var isPlaying = false
@@ -15,7 +14,6 @@ import Observation
     }
 
     func refresh(state: String? = nil) {
-        // Don't AppleScript a quitting Spotify: `tell application` would relaunch it.
         let output = state == "Stopped" ? "" : NSAppleScript(source: """
             if application "Spotify" is running then
                 tell application "Spotify" to return (player state as string) & linefeed & (artwork url of current track)
