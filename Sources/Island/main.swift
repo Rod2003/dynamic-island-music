@@ -40,10 +40,11 @@ struct IslandView: View {
 
     var body: some View {
         HStack(spacing: 0) {
-            AsyncImage(url: nowPlaying.artworkURL) { $0.resizable() } placeholder: {
-                if let icon = nowPlaying.icon { Image(nsImage: icon).resizable().scaleEffect(1024 / 824) } else { Color.gray.opacity(0.3) }
+            AsyncImage(url: nowPlaying.artworkURL) {
+                $0.resizable().clipShape(RoundedRectangle(cornerRadius: Self.bottomRadius - Self.inset, style: .continuous))
+            } placeholder: {
+                if let icon = nowPlaying.icon { Image(nsImage: icon).resizable() }
             }
-                .clipShape(RoundedRectangle(cornerRadius: Self.bottomRadius - Self.inset, style: .continuous))
                 .padding(Self.inset)
                 .frame(width: height)
             Spacer().frame(width: notchWidth)
