@@ -17,7 +17,7 @@ func layout() {
     guard let screen = NSScreen.screens.first(where: { $0.safeAreaInsets.top > 0 }),
           let left = screen.auxiliaryTopLeftArea, let right = screen.auxiliaryTopRightArea else { return }
     let height = screen.safeAreaInsets.top, notchWidth = screen.frame.width - left.width - right.width
-    let size = CGSize(width: notchWidth + 2 * (height + IslandView.margin + IslandView.flare), height: height)
+    let size = CGSize(width: notchWidth + 2 * (height + IslandView.flare), height: height)
     let hosting = NSHostingView(rootView: IslandView(nowPlaying: nowPlaying, tap: tap, notchWidth: notchWidth, height: height))
     hosting.sizingOptions = []
     panel.contentView = hosting
@@ -36,22 +36,20 @@ struct IslandView: View {
     let notchWidth: CGFloat
     let height: CGFloat
 
-    static let flare: CGFloat = 6, bottomRadius: CGFloat = 14, inset: CGFloat = 6, margin: CGFloat = 6
+    static let flare: CGFloat = 6, bottomRadius: CGFloat = 14, inset: CGFloat = 6
 
     var body: some View {
         HStack(spacing: 0) {
             AsyncImage(url: nowPlaying.artworkURL) { $0.resizable() } placeholder: {
-                if let icon = nowPlaying.icon { Image(nsImage: icon).resizable() } else { Color.gray.opacity(0.3) }
+                if let icon = nowPlaying.icon { Image(nsImage: icon).resizable().scaleEffect(1024 / 824) } else { Color.gray.opacity(0.3) }
             }
-                .clipShape(RoundedRectangle(cornerRadius: 5, style: .continuous))
+                .clipShape(RoundedRectangle(cornerRadius: Self.bottomRadius - Self.inset, style: .continuous))
                 .padding(Self.inset)
                 .frame(width: height)
-                .padding(.leading, Self.margin)
             Spacer().frame(width: notchWidth)
             Bars(tap: tap)
                 .padding(Self.inset)
                 .frame(width: height)
-                .padding(.trailing, Self.margin)
         }
         .padding(.horizontal, Self.flare)
         .frame(height: height)
