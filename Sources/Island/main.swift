@@ -39,9 +39,10 @@ struct IslandView: View {
     static let flare: CGFloat = 6, bottomRadius: CGFloat = 14, inset: CGFloat = 6
 
     var body: some View {
+        let icon = height - 2 * Self.inset
         HStack(spacing: 0) {
             AsyncImage(url: nowPlaying.artworkURL) {
-                $0.resizable().clipShape(RoundedRectangle(cornerRadius: Self.bottomRadius - Self.inset, style: .continuous))
+                $0.resizable().clipShape(RoundedRectangle(cornerRadius: icon * 185.4 / 1024, style: .continuous)).padding(icon * 100 / 1024)
             } placeholder: {
                 if let icon = nowPlaying.icon { Image(nsImage: icon).resizable() }
             }
