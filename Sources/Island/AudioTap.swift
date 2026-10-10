@@ -8,12 +8,12 @@ final class AudioTap {
     private let contrast: [Float] = [2, 1.3, 1, 1, 1, 1], beatTime: Float = 0.25
     private let rangeDB: Float = 18, peakFallDB: Float = 0.06
     private let attack: Float = 0.015, release: Float = 0.06
+    private let showAfter: Float = 2.5, hideAfter: Float = 2
     static let publishRate: Double = 60
 
     var onLevels: ([Float]) -> Void = { _ in }
+    var onPlayingChange: (Bool) -> Void = { _ in }
 
-    private var active = false
-    private var tapped = AudioObjectID(kAudioObjectUnknown)
     private var tapID = AudioObjectID(kAudioObjectUnknown)
     private var deviceID = AudioObjectID(kAudioObjectUnknown)
     private var procID: AudioDeviceIOProcID?
@@ -22,31 +22,17 @@ final class AudioTap {
     private var ring = [Float](repeating: 0, count: 2048)
     private let window = vDSP.window(ofType: Float.self, usingSequence: .hanningDenormalized, count: 2048, isHalfWindow: false)
     private let dft = try! vDSP.DiscreteFourierTransform(count: 2048, direction: .forward, transformType: .complexComplex, ofType: Float.self)
+    private var isPlaying = false, heard: Float = 0, quiet: Float = 0
     private var lastPublish: UInt64 = 0
     private var peakDB: Float = -100
     private var bandAvg: [Float]?
     private var bandRecent: [Float]?
     private var smoothed = [Float](repeating: 0, count: 6)
 
-    init() {
-        var addr = AudioObjectPropertyAddress(mSelector: kAudioHardwarePropertyProcessObjectList, mScope: kAudioObjectPropertyScopeGlobal, mElement: kAudioObjectPropertyElementMain)
-        AudioObjectAddPropertyListenerBlock(AudioObjectID(kAudioObjectSystemObject), &addr, .main) { [weak self] _, _ in
-            if self?.active == true { self?.rebuild() }
-        }
-    }
-
-    func start() { active = true; rebuild() }
-    func stop() { active = false; teardown() }
-
-    private func rebuild() {
-        guard let pid = NSRunningApplication.runningApplications(withBundleIdentifier: "com.spotify.client").first?.processIdentifier else { return }
-        let spotify = get(AudioObjectID(kAudioObjectSystemObject), kAudioHardwarePropertyTranslatePIDToProcessObject, AudioObjectID(kAudioObjectUnknown), pid: pid)
-        guard spotify != kAudioObjectUnknown, spotify != tapped else { return }
-        teardown()
-        tapped = spotify
-        let desc = CATapDescription(stereoMixdownOfProcesses: [spotify])
+    func start() {
+        let desc = CATapDescription(stereoGlobalTapButExcludeProcesses: [])
         guard AudioHardwareCreateProcessTap(desc, &tapID) == noErr else { return }
-        let sampleRate = Float(get(tapID, kAudioTapPropertyFormat, AudioStreamBasicDescription()).mSampleRate)
+        let sampleRate = Float(property(tapID, kAudioTapPropertyFormat, AudioStreamBasicDescription()).mSampleRate)
         let aggregate: [String: Any] = [
             kAudioAggregateDeviceUIDKey: UUID().uuidString,
             kAudioAggregateDeviceIsPrivateKey: true,
@@ -60,20 +46,25 @@ final class AudioTap {
         AudioDeviceStart(deviceID, procID)
     }
 
-    private func teardown() {
-        if let procID { AudioDeviceStop(deviceID, procID); AudioDeviceDestroyIOProcID(deviceID, procID) }
-        if deviceID != kAudioObjectUnknown { AudioHardwareDestroyAggregateDevice(deviceID) }
-        if tapID != kAudioObjectUnknown { AudioHardwareDestroyProcessTap(tapID) }
-        procID = nil; deviceID = AudioObjectID(kAudioObjectUnknown); tapID = AudioObjectID(kAudioObjectUnknown); tapped = AudioObjectID(kAudioObjectUnknown)
-    }
-
     private func analyze(_ input: UnsafePointer<AudioBufferList>, sampleRate: Float) {
         let buffers = UnsafeMutableAudioBufferListPointer(UnsafeMutablePointer(mutating: input))
         guard let buffer = buffers.first, let data = buffer.mData?.assumingMemoryBound(to: Float.self) else { return }
         let stride = max(1, Int(buffer.mNumberChannels))
         let frames = Int(buffer.mDataByteSize) / MemoryLayout<Float>.size / stride
-        ring = Array((ring + (max(0, frames - n)..<frames).map { data[$0 * stride] }).suffix(n))
+        let fresh = (max(0, frames - n)..<frames).map { data[$0 * stride] }
+        let dt = Float(frames) / sampleRate
 
+        let audible = vDSP.maximumMagnitude(fresh) > 1e-4
+        heard = audible ? heard + dt : 0
+        quiet = audible ? 0 : quiet + dt
+        let playing = isPlaying ? quiet < hideAfter : heard > showAfter
+        if playing != isPlaying {
+            isPlaying = playing
+            DispatchQueue.main.async { self.onPlayingChange(playing) }
+        }
+        guard playing else { return }
+
+        ring = Array((ring + fresh).suffix(n))
         let (re, im) = dft.transform(real: vDSP.multiply(ring, window), imaginary: [Float](repeating: 0, count: n))
         let binHz = sampleRate / Float(n)
         let bandDB = (0..<smoothed.count).map { band -> Float in
@@ -81,7 +72,6 @@ final class AudioTap {
             let power = (vDSP.sumOfSquares(re[lo..<hi]) + vDSP.sumOfSquares(im[lo..<hi])) * 4 / Float(n * n)
             return 10 * log10(power + 1e-18)
         }
-        let dt = Float(frames) / sampleRate
         if bandDB.max()! > -90 {
             let rise = 1 - exp(-dt / balanceRise), fall = 1 - exp(-dt / balanceFall)
             bandAvg = zip(bandAvg ?? bandDB, bandDB).map { a, x in a + (x - a) * (x > a ? rise : fall) }
@@ -101,11 +91,23 @@ final class AudioTap {
         DispatchQueue.main.async { [smoothed] in self.onLevels(smoothed) }
     }
 
-    private func get<T>(_ id: AudioObjectID, _ selector: AudioObjectPropertySelector, _ initial: T, pid: pid_t = 0) -> T {
-        var addr = AudioObjectPropertyAddress(mSelector: selector, mScope: kAudioObjectPropertyScopeGlobal, mElement: kAudioObjectPropertyElementMain)
-        var value = initial, size = UInt32(MemoryLayout<T>.size), pid = pid
-        let pidSize = UInt32(pid == 0 ? 0 : MemoryLayout<pid_t>.size)
-        _ = withUnsafeMutablePointer(to: &value) { AudioObjectGetPropertyData(id, &addr, pidSize, &pid, &size, $0) }
-        return value
+    static func audibleApp() -> NSRunningApplication? {
+        let system = AudioObjectID(kAudioObjectSystemObject)
+        var addr = AudioObjectPropertyAddress(mSelector: kAudioHardwarePropertyProcessObjectList, mScope: kAudioObjectPropertyScopeGlobal, mElement: kAudioObjectPropertyElementMain)
+        var size: UInt32 = 0
+        AudioObjectGetPropertyDataSize(system, &addr, 0, nil, &size)
+        var ids = [AudioObjectID](repeating: 0, count: Int(size) / MemoryLayout<AudioObjectID>.size)
+        AudioObjectGetPropertyData(system, &addr, 0, nil, &size, &ids)
+        let bundleIDs = ids.filter { property($0, kAudioProcessPropertyIsRunningOutput, UInt32(0)) != 0 }
+            .map { property($0, kAudioProcessPropertyBundleID, "" as CFString) as String }
+        let apps = NSWorkspace.shared.runningApplications.filter { $0.activationPolicy == .regular }
+        return bundleIDs.lazy.compactMap { id in apps.first { id.hasPrefix($0.bundleIdentifier ?? "\0") } }.first
     }
+}
+
+private func property<T>(_ id: AudioObjectID, _ selector: AudioObjectPropertySelector, _ initial: T) -> T {
+    var addr = AudioObjectPropertyAddress(mSelector: selector, mScope: kAudioObjectPropertyScopeGlobal, mElement: kAudioObjectPropertyElementMain)
+    var value = initial, size = UInt32(MemoryLayout<T>.size)
+    _ = withUnsafeMutablePointer(to: &value) { AudioObjectGetPropertyData(id, &addr, 0, nil, &size, $0) }
+    return value
 }

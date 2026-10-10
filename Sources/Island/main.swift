@@ -1,8 +1,9 @@
 import AppKit
 import SwiftUI
 
+let nowPlaying = NowPlaying()
 let tap = AudioTap()
-let spotify = Spotify { playing in playing ? tap.start() : tap.stop() }
+tap.onPlayingChange = { nowPlaying.update(playing: $0) }
 
 let panel = NSPanel(contentRect: .zero, styleMask: [.borderless, .nonactivatingPanel], backing: .buffered, defer: false)
 panel.isOpaque = false
@@ -16,8 +17,8 @@ func layout() {
     guard let screen = NSScreen.screens.first(where: { $0.safeAreaInsets.top > 0 }),
           let left = screen.auxiliaryTopLeftArea, let right = screen.auxiliaryTopRightArea else { return }
     let height = screen.safeAreaInsets.top, notchWidth = screen.frame.width - left.width - right.width
-    let size = CGSize(width: notchWidth + 2 * (height + IslandView.flare), height: height)
-    let hosting = NSHostingView(rootView: IslandView(spotify: spotify, tap: tap, notchWidth: notchWidth, height: height))
+    let size = CGSize(width: notchWidth + 2 * (height + IslandView.margin + IslandView.flare), height: height)
+    let hosting = NSHostingView(rootView: IslandView(nowPlaying: nowPlaying, tap: tap, notchWidth: notchWidth, height: height))
     hosting.sizingOptions = []
     panel.contentView = hosting
     panel.setFrame(NSRect(x: screen.frame.midX - size.width / 2, y: screen.frame.maxY - size.height, width: size.width, height: size.height), display: true)
@@ -26,33 +27,37 @@ func layout() {
 layout()
 NotificationCenter.default.addObserver(forName: NSApplication.didChangeScreenParametersNotification, object: nil, queue: .main) { _ in layout() }
 panel.orderFrontRegardless()
-spotify.refresh()
+tap.start()
 NSApplication.shared.run()
 
 struct IslandView: View {
-    let spotify: Spotify
+    let nowPlaying: NowPlaying
     let tap: AudioTap
     let notchWidth: CGFloat
     let height: CGFloat
 
-    static let flare: CGFloat = 6, bottomRadius: CGFloat = 14, inset: CGFloat = 5
+    static let flare: CGFloat = 6, bottomRadius: CGFloat = 14, inset: CGFloat = 6, margin: CGFloat = 6
 
     var body: some View {
         HStack(spacing: 0) {
-            AsyncImage(url: spotify.artworkURL) { $0.resizable() } placeholder: { Color.gray.opacity(0.3) }
-                .clipShape(RoundedRectangle(cornerRadius: 5))
+            AsyncImage(url: nowPlaying.artworkURL) { $0.resizable() } placeholder: {
+                if let icon = nowPlaying.icon { Image(nsImage: icon).resizable() } else { Color.gray.opacity(0.3) }
+            }
+                .clipShape(RoundedRectangle(cornerRadius: 5, style: .continuous))
                 .padding(Self.inset)
                 .frame(width: height)
+                .padding(.leading, Self.margin)
             Spacer().frame(width: notchWidth)
             Bars(tap: tap)
                 .padding(Self.inset)
                 .frame(width: height)
+                .padding(.trailing, Self.margin)
         }
         .padding(.horizontal, Self.flare)
         .frame(height: height)
         .background(.black, in: NotchShape())
-        .opacity(spotify.isPlaying ? 1 : 0)
-        .animation(.easeInOut(duration: 0.25), value: spotify.isPlaying)
+        .opacity(nowPlaying.isPlaying ? 1 : 0)
+        .animation(.easeInOut(duration: 0.25), value: nowPlaying.isPlaying)
     }
 }
 
@@ -98,14 +103,15 @@ final class BarsView: NSView {
 
 struct NotchShape: Shape {
     func path(in r: CGRect) -> Path {
-        let f = IslandView.flare, b = IslandView.bottomRadius
-        var p = Path()
-        p.move(to: CGPoint(x: r.minX, y: r.minY))
-        p.addArc(tangent1End: CGPoint(x: r.minX + f, y: r.minY), tangent2End: CGPoint(x: r.minX + f, y: r.maxY), radius: f)
-        p.addArc(tangent1End: CGPoint(x: r.minX + f, y: r.maxY), tangent2End: CGPoint(x: r.maxX, y: r.maxY), radius: b)
-        p.addArc(tangent1End: CGPoint(x: r.maxX - f, y: r.maxY), tangent2End: CGPoint(x: r.maxX - f, y: r.minY), radius: b)
-        p.addArc(tangent1End: CGPoint(x: r.maxX - f, y: r.minY), tangent2End: CGPoint(x: r.maxX, y: r.minY), radius: f)
-        p.addLine(to: CGPoint(x: r.maxX, y: r.minY))
-        return p
+        let f = IslandView.flare, k: CGFloat = 0.45
+        var flares = Path()
+        for (edge, dir) in [(r.minX, CGFloat(1)), (r.maxX, -1)] {
+            flares.move(to: CGPoint(x: edge, y: r.minY))
+            flares.addLine(to: CGPoint(x: edge + dir * f, y: r.minY))
+            flares.addLine(to: CGPoint(x: edge + dir * f, y: r.minY + f))
+            flares.addCurve(to: CGPoint(x: edge, y: r.minY), control1: CGPoint(x: edge + dir * f, y: r.minY + f * k), control2: CGPoint(x: edge + dir * f * k, y: r.minY))
+        }
+        let body = UnevenRoundedRectangle(bottomLeadingRadius: IslandView.bottomRadius, bottomTrailingRadius: IslandView.bottomRadius, style: .continuous)
+        return body.path(in: r.insetBy(dx: f, dy: 0)).union(flares)
     }
 }
