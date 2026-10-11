@@ -10,11 +10,6 @@
           "name" : "waveform"
         }
       ],
-      "shadow" : {
-        "kind" : "neutral",
-        "opacity" : 0.5
-      },
-      "specular" : true,
       "translucency" : {
         "enabled" : false,
         "value" : 0.5

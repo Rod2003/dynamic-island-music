@@ -1,7 +1,7 @@
 import AppKit
 import SwiftUI
 
-let nowPlaying = NowPlaying()
+let nowPlaying: NowPlaying = SpotifyNowPlaying()
 let tap = AudioTap()
 tap.onPlayingChange = { nowPlaying.update(playing: $0) }
 

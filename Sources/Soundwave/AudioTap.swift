@@ -14,10 +14,6 @@ final class AudioTap {
     var onLevels: ([Float]) -> Void = { _ in }
     var onPlayingChange: (Bool) -> Void = { _ in }
 
-    private var tapID = AudioObjectID(kAudioObjectUnknown)
-    private var deviceID = AudioObjectID(kAudioObjectUnknown)
-    private var procID: AudioDeviceIOProcID?
-
     private let n = 2048
     private var ring = [Float](repeating: 0, count: 2048)
     private let window = vDSP.window(ofType: Float.self, usingSequence: .hanningDenormalized, count: 2048, isHalfWindow: false)
@@ -31,6 +27,7 @@ final class AudioTap {
 
     func start() {
         let desc = CATapDescription(stereoGlobalTapButExcludeProcesses: [])
+        var tapID = AudioObjectID(kAudioObjectUnknown), deviceID = AudioObjectID(kAudioObjectUnknown), procID: AudioDeviceIOProcID?
         guard AudioHardwareCreateProcessTap(desc, &tapID) == noErr else { return }
         let sampleRate = Float(property(tapID, kAudioTapPropertyFormat, AudioStreamBasicDescription()).mSampleRate)
         let aggregate: [String: Any] = [
@@ -100,7 +97,6 @@ final class AudioTap {
         AudioObjectGetPropertyData(system, &addr, 0, nil, &size, &ids)
         let bundleIDs = ids.filter { property($0, kAudioProcessPropertyIsRunningOutput, UInt32(0)) != 0 }
             .map { (property($0, kAudioProcessPropertyBundleID, "" as CFString) as String).lowercased() }
-            .map { $0.hasPrefix("com.apple.webkit") ? "com.apple.safari" : $0 }
         let apps = NSWorkspace.shared.runningApplications.filter { $0.activationPolicy == .regular }
         return bundleIDs.lazy.compactMap { id in apps.first { id.hasPrefix($0.bundleIdentifier?.lowercased() ?? "\0") } }.first
     }
