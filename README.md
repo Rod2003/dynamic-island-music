@@ -16,6 +16,8 @@ Needs a MacBook with a notch and macOS 14.2 or later. There's no Dock icon; quit
 ./run.sh release    # notarize and zip to .build/Soundwave.zip (needs a "notary" notarytool profile)
 ```
 
+To publish a release, bump `CFBundleShortVersionString` in `Info.plist` and push a matching tag (`git tag v1.0.1 && git push origin v1.0.1`); GitHub Actions builds, notarizes and publishes it.
+
 ## License
 
 MIT
