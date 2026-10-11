@@ -5,7 +5,13 @@ APP=.build/Island.app
 mkdir -p "$APP/Contents/MacOS"
 cp .build/release/Island "$APP/Contents/MacOS/"
 cp Info.plist "$APP/Contents/"
-ID=$(security find-identity -v -p codesigning | awk '/Apple Development/ {print $2; exit}')
-codesign --force --sign "${ID:--}" "$APP"
+codesign --force --timestamp --options runtime --entitlements Island.entitlements --sign "Developer ID Application" "$APP"
+if [ "$1" = release ]; then
+  ditto -c -k --keepParent "$APP" .build/Island.zip
+  xcrun notarytool submit .build/Island.zip --keychain-profile notary --wait
+  xcrun stapler staple "$APP"
+  ditto -c -k --keepParent "$APP" .build/Island.zip
+  exit
+fi
 pkill -x Island || true
 open "$APP"

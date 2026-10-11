@@ -99,9 +99,10 @@ final class AudioTap {
         var ids = [AudioObjectID](repeating: 0, count: Int(size) / MemoryLayout<AudioObjectID>.size)
         AudioObjectGetPropertyData(system, &addr, 0, nil, &size, &ids)
         let bundleIDs = ids.filter { property($0, kAudioProcessPropertyIsRunningOutput, UInt32(0)) != 0 }
-            .map { property($0, kAudioProcessPropertyBundleID, "" as CFString) as String }
+            .map { (property($0, kAudioProcessPropertyBundleID, "" as CFString) as String).lowercased() }
+            .map { $0.hasPrefix("com.apple.webkit") ? "com.apple.safari" : $0 }
         let apps = NSWorkspace.shared.runningApplications.filter { $0.activationPolicy == .regular }
-        return bundleIDs.lazy.compactMap { id in apps.first { id.hasPrefix($0.bundleIdentifier ?? "\0") } }.first
+        return bundleIDs.lazy.compactMap { id in apps.first { id.hasPrefix($0.bundleIdentifier?.lowercased() ?? "\0") } }.first
     }
 }
 
