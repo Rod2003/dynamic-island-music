@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>CFBundleShortVersionString</key>
+	<string>1.0.0</string>
+	<key>CFBundleVersion</key>
+	<string>1</string>
+	<key>CFBundleIconName</key>
+	<string>Soundwave</string>
+	<key>CFBundleIdentifier</key>
+	<string>com.rod.soundwave</string>
+	<key>LSUIElement</key>
+	<true/>
+	<key>NSAppleEventsUsageDescription</key>
+	<string>Soundwave asks Spotify for the current track's artwork.</string>
+	<key>NSAudioCaptureUsageDescription</key>
+	<string>Soundwave listens to system audio to draw the waveform.</string>
+</dict>
+</plist>
