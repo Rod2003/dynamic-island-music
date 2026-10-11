@@ -1,17 +1,18 @@
 #!/bin/sh
 set -e
 swift build -c release
-APP=.build/Island.app
-mkdir -p "$APP/Contents/MacOS"
-cp .build/release/Island "$APP/Contents/MacOS/"
+APP=.build/Soundwave.app
+mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
+cp .build/release/Soundwave "$APP/Contents/MacOS/"
 cp Info.plist "$APP/Contents/"
-codesign --force --timestamp --options runtime --entitlements Island.entitlements --sign "Developer ID Application" "$APP"
+xcrun actool Soundwave.icon --compile "$APP/Contents/Resources" --platform macosx --minimum-deployment-target 14.2 --app-icon Soundwave --output-partial-info-plist .build/icon.plist >/dev/null
+codesign --force --timestamp --options runtime --entitlements Soundwave.entitlements --sign "Developer ID Application" "$APP"
 if [ "$1" = release ]; then
-  ditto -c -k --keepParent "$APP" .build/Island.zip
-  xcrun notarytool submit .build/Island.zip --keychain-profile notary --wait
+  ditto -c -k --keepParent "$APP" .build/Soundwave.zip
+  xcrun notarytool submit .build/Soundwave.zip --keychain-profile notary --wait
   xcrun stapler staple "$APP"
-  ditto -c -k --keepParent "$APP" .build/Island.zip
+  ditto -c -k --keepParent "$APP" .build/Soundwave.zip
   exit
 fi
-pkill -x Island || true
+pkill -x Soundwave || true
 open "$APP"

@@ -40,7 +40,7 @@ final class AudioTap {
             kAudioAggregateDeviceTapListKey: [[kAudioSubTapUIDKey: desc.uuid.uuidString]],
         ]
         guard AudioHardwareCreateAggregateDevice(aggregate as CFDictionary, &deviceID) == noErr,
-              AudioDeviceCreateIOProcIDWithBlock(&procID, deviceID, DispatchQueue(label: "island.tap", qos: .userInteractive), { [weak self] _, input, _, _, _ in
+              AudioDeviceCreateIOProcIDWithBlock(&procID, deviceID, DispatchQueue(label: "soundwave.tap", qos: .userInteractive), { [weak self] _, input, _, _, _ in
                   self?.analyze(input, sampleRate: sampleRate)
               }) == noErr else { return }
         AudioDeviceStart(deviceID, procID)

@@ -2,13 +2,17 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
+	<key>CFBundleIconFile</key>
+	<string>Soundwave</string>
+	<key>CFBundleIconName</key>
+	<string>Soundwave</string>
 	<key>CFBundleIdentifier</key>
-	<string>com.rod.island</string>
+	<string>com.rod.soundwave</string>
 	<key>LSUIElement</key>
 	<true/>
 	<key>NSAudioCaptureUsageDescription</key>
-	<string>Island listens to system audio to draw the waveform.</string>
+	<string>Soundwave listens to system audio to draw the waveform.</string>
 	<key>NSAppleEventsUsageDescription</key>
-	<string>Island asks Spotify for the current track's artwork.</string>
+	<string>Soundwave asks Spotify for the current track's artwork.</string>
 </dict>
 </plist>

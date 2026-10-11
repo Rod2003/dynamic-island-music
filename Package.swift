@@ -2,7 +2,7 @@
 import PackageDescription
 
 let package = Package(
-    name: "Island",
+    name: "Soundwave",
     platforms: [.macOS("14.2")],
-    targets: [.executableTarget(name: "Island")]
+    targets: [.executableTarget(name: "Soundwave")]
 )
