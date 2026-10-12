@@ -1,3 +1,4 @@
+import AppKit
 import SoundwaveAudio
 import SoundwaveConfig
 import SoundwaveNowPlaying
@@ -17,7 +18,7 @@ struct IslandView: View {
             AsyncImage(url: nowPlaying.artworkURL) {
                 $0.resizable().clipShape(RoundedRectangle(cornerRadius: icon * 185.4 / 1024, style: .continuous)).padding(icon * 100 / 1024)
             } placeholder: {
-                if let icon = nowPlaying.icon { Image(nsImage: icon).resizable() }
+                Image(nsImage: nowPlaying.icon ?? NSWorkspace.shared.icon(for: .applicationBundle)).resizable()
             }
                 .padding(C.inset)
                 .frame(width: height)
